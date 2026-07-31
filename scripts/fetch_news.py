@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 
 import feedparser
+import requests
+from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parents[1]
 if hasattr(sys.stdout, "reconfigure"):
@@ -32,11 +34,13 @@ SOURCES = {
     "اسپاش": ["https://espash.ir/feed/"],
     "TechCrunch": ["https://techcrunch.com/feed/"],
     "Sky & Telescope": ["https://skyandtelescope.com/feed/"],
-    "اکوایران": ["https://ecoiran.com/fa/rss/allnews"],
+    "اکوایران": ["https://ecoiran.com/feeds/"],
     "عصر اقتصاد": ["https://asre-eghtesad.com/feed/"],
     "The Economist": ["https://www.economist.com/the-world-this-week/rss.xml", "https://www.economist.com/business/rss.xml", "https://www.economist.com/science-and-technology/rss.xml"],
     "Bloomberg": ["https://feeds.bloomberg.com/technology/news.rss", "https://feeds.bloomberg.com/markets/news.rss", "https://feeds.bloomberg.com/economics/news.rss"],
 }
+
+HTML_SOURCES = {"عصر اقتصاد": "https://asre-eghtesad.com/"}
 
 TOPICS = {
     "space": ["فضا", "نجوم", "سیاره", "مریخ", "ماه", "خورشید", "ستاره", "کهکشان", "سیاه چاله", "سیاه‌چاله", "تلسکوپ", "جیمز وب", "هابل", "اسپیس ایکس", "اسپیس‌ایکس", "ماهواره", "فضانورد", "ناسا", "شهاب", "asteroid", "astronomy", "space", "spacex", "nasa", "starship", "telescope", "galaxy", "planet", "exoplanet", "black hole"],
@@ -87,6 +91,46 @@ def classify(text: str) -> tuple[str, list[str]]:
     return topic, tags or ["تازه‌ها"]
 
 
+def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[str]) -> list[dict]:
+    """Fallback for publishers whose advertised RSS URL returns an HTML page."""
+    response = requests.get(url, headers=headers, timeout=35)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    domain = urlparse(url).netloc.removeprefix("www.")
+    results = []
+    blocked = ("/category/", "/tag/", "/author/", "/page/", "/feed/", "/wp-content/")
+    for anchor in soup.select("a[href]"):
+        link = anchor.get("href", "").split("#")[0]
+        if link.startswith("/"):
+            link = url.rstrip("/") + link
+        parsed = urlparse(link)
+        title = clean(anchor.get_text(" ", strip=True), 180)
+        key = re.sub(r"\W", "", title.casefold())
+        if (parsed.netloc.removeprefix("www.") != domain or len(title) < 25
+                or any(part in parsed.path for part in blocked) or parsed.path in ("", "/")
+                or key in seen):
+            continue
+        container = anchor.find_parent(["article", "li"]) or anchor.parent
+        image_url = ""
+        picture = container.find("img") if container else None
+        if picture:
+            image_url = picture.get("data-src") or picture.get("src") or ""
+            if image_url.startswith("/"):
+                image_url = url.rstrip("/") + image_url
+        summary = ""
+        paragraph = container.find("p") if container else None
+        if paragraph:
+            summary = clean(paragraph.get_text(" ", strip=True))
+        topic, tags = classify(f"{title} {summary}")
+        results.append({"title": title, "summary": summary, "link": link, "source": source,
+            "published": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "image": image_url, "topic": topic, "tags": tags})
+        seen.add(key)
+        if len(results) >= 40:
+            break
+    return results
+
+
 def main() -> None:
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
     articles, seen, status = [], set(), {}
@@ -120,6 +164,13 @@ def main() -> None:
                     "image": image(entry), "topic": topic, "tags": tags})
                 seen.add(key); count += 1
                 if count >= MAX_PER_SOURCE: break
+        if count == 0 and source in HTML_SOURCES:
+            try:
+                scraped = scrape_homepage(source, HTML_SOURCES[source], headers, seen)
+                articles.extend(scraped)
+                count += len(scraped)
+            except requests.RequestException as exc:
+                print(f"HTML fallback failed for {source}: {exc}")
         status[source] = count
         print(f"{source}: {count}")
     articles.sort(key=lambda a: a["published"], reverse=True)
