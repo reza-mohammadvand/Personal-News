@@ -5,6 +5,7 @@ import html
 import json
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
@@ -40,7 +41,15 @@ SOURCES = {
     "Bloomberg": ["https://feeds.bloomberg.com/technology/news.rss", "https://feeds.bloomberg.com/markets/news.rss", "https://feeds.bloomberg.com/economics/news.rss"],
 }
 
-HTML_SOURCES = {"عصر اقتصاد": "https://asre-eghtesad.com/"}
+HTML_SOURCES = {
+    "شهر سخت‌افزار": "https://www.shahrsakhtafzar.com/fa/",
+    "عصر اقتصاد": "https://asre-eghtesad.com/",
+}
+
+TOPIC_PRIORITY = {
+    "technology": 3, "space": 3, "economy": 3,
+    "science": 2, "gaming": 1, "politics": 1, "other": 0,
+}
 
 TOPICS = {
     "space": ["فضا", "نجوم", "سیاره", "مریخ", "ماه", "خورشید", "ستاره", "کهکشان", "سیاه چاله", "سیاه‌چاله", "تلسکوپ", "جیمز وب", "هابل", "اسپیس ایکس", "اسپیس‌ایکس", "ماهواره", "فضانورد", "ناسا", "شهاب", "asteroid", "astronomy", "space", "spacex", "nasa", "starship", "telescope", "galaxy", "planet", "exoplanet", "black hole"],
@@ -91,7 +100,7 @@ def classify(text: str) -> tuple[str, list[str]]:
     return topic, tags or ["تازه‌ها"]
 
 
-def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[str]) -> list[dict]:
+def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[str], limit: int = 40) -> list[dict]:
     """Fallback for publishers whose advertised RSS URL returns an HTML page."""
     response = requests.get(url, headers=headers, timeout=35)
     response.raise_for_status()
@@ -124,11 +133,40 @@ def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[st
         topic, tags = classify(f"{title} {summary}")
         results.append({"title": title, "summary": summary, "link": link, "source": source,
             "published": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "image": image_url, "topic": topic, "tags": tags})
+            "image": image_url, "topic": topic, "tags": tags,
+            "priority": TOPIC_PRIORITY[topic]})
         seen.add(key)
-        if len(results) >= 40:
+        if len(results) >= limit:
             break
     return results
+
+
+def is_english(text: str) -> bool:
+    letters = re.findall(r"[A-Za-z\u0600-\u06ff]", text)
+    return bool(letters) and sum(ch.isascii() for ch in letters) / len(letters) > 0.65
+
+
+def translate_article(article: dict) -> dict:
+    """Translate English cards to Persian; leave the original untouched on any failure."""
+    if not is_english(article["title"]):
+        return article
+    separator = "NABZSEPARATOR"
+    original = article["title"] + f"\n\n{separator}\n\n" + article.get("summary", "")[:700]
+    try:
+        response = requests.get(
+            "https://translate.googleapis.com/translate_a/single",
+            params={"client": "gtx", "sl": "en", "tl": "fa", "dt": "t", "q": original},
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=18,
+        )
+        response.raise_for_status()
+        translated = "".join(piece[0] for piece in response.json()[0] if piece[0])
+        title, summary = translated.split(separator, 1)
+        article["title"] = clean(title, 180)
+        article["summary"] = clean(summary)
+        article["translated"] = True
+    except (requests.RequestException, ValueError, TypeError, IndexError):
+        article["translated"] = False
+    return article
 
 
 def main() -> None:
@@ -161,19 +199,31 @@ def main() -> None:
                 # Keep broad-interest items from the user's hand-picked sources.
                 articles.append({"title": title, "summary": summary, "link": link,
                     "source": source, "published": date.isoformat().replace("+00:00", "Z"),
-                    "image": image(entry), "topic": topic, "tags": tags})
+                    "image": image(entry), "topic": topic, "tags": tags,
+                    "priority": TOPIC_PRIORITY[topic]})
                 seen.add(key); count += 1
                 if count >= MAX_PER_SOURCE: break
-        if count == 0 and source in HTML_SOURCES:
+        if source in HTML_SOURCES and count < MAX_PER_SOURCE:
             try:
-                scraped = scrape_homepage(source, HTML_SOURCES[source], headers, seen)
+                scraped = scrape_homepage(
+                    source, HTML_SOURCES[source], headers, seen,
+                    limit=MAX_PER_SOURCE - count,
+                )
                 articles.extend(scraped)
                 count += len(scraped)
             except requests.RequestException as exc:
                 print(f"HTML fallback failed for {source}: {exc}")
         status[source] = count
         print(f"{source}: {count}")
-    articles.sort(key=lambda a: a["published"], reverse=True)
+    english = [article for article in articles if is_english(article["title"])]
+    if english:
+        print(f"Translating {len(english)} English articles...")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(translate_article, article) for article in english]
+            for future in as_completed(futures):
+                future.result()
+        print(f"Translated {sum(1 for article in english if article.get('translated'))}/{len(english)} articles")
+    articles.sort(key=lambda a: (a["priority"], a["published"]), reverse=True)
     payload = {"updated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "articles": articles, "sources": status}
     out = ROOT / "data" / "news.json"; out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
