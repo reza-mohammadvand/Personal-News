@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b10">
+  <meta name="description" content="نبض — گلچین روزانه اخبار فناوری، اقتصاد و فضا">
+  <title>نبض | گلچین خبرهای شما</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="glow glow-one"></div><div class="glow glow-two"></div>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="صفحه نخست"><span class="brand-mark">ن</span><span>نبض</span></a>
+    <div class="header-actions">
+      <span class="update" id="updateLabel"><i></i> در حال دریافت اخبار…</span>
+      <button class="icon-btn" id="themeButton" aria-label="تغییر پوسته" title="تغییر پوسته">☼</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">گلچین شخصی شما</span>
+      <h1>خبرهای مهم،<br><span>بدون هیاهو.</span></h1>
+      <p>تازه‌ترین مطالب فناوری، اقتصاد و جهان شگفت‌انگیز فضا؛ یک‌جا و مرتب.</p>
+    </section>
+
+    <section class="controls" aria-label="فیلتر اخبار">
+      <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="جست‌وجو در خبرها…" autocomplete="off"></label>
+      <div class="select-wrap"><label for="daysSelect">بازه زمانی</label><select id="daysSelect"><option value="1" selected>۲۴ ساعت گذشته</option><option value="2">۲ روز گذشته</option><option value="3">۳ روز گذشته</option><option value="7">هفته گذشته</option><option value="14">۲ هفته گذشته</option><option value="30">ماه گذشته</option></select></div>
+      <div class="select-wrap"><label for="sourceSelect">منبع</label><select id="sourceSelect"><option value="all">همه منابع</option></select></div>
+    </section>
+
+    <nav class="topics" id="topicTabs" aria-label="موضوع‌ها">
+      <button class="topic active" data-topic="all">همه خبرها</button>
+      <button class="topic" data-topic="technology">فناوری</button>
+      <button class="topic" data-topic="space">فضا و نجوم</button>
+      <button class="topic" data-topic="economy">اقتصاد</button>
+      <button class="topic" data-topic="science">علم و سلامت</button>
+      <button class="topic" data-topic="gaming">بازی و سرگرمی</button>
+      <button class="topic" data-topic="politics">سیاست و جهان</button>
+    </nav>
+
+    <section class="feed-head"><div><h2>تازه‌ها</h2><span id="resultCount">— خبر</span></div><button id="refreshButton" class="refresh">↻ تازه‌سازی</button></section>
+    <section class="news-grid" id="newsGrid" aria-live="polite"></section>
+    <div class="state hidden" id="emptyState"><span>⌁</span><h3>خبری پیدا نشد</h3><p>بازه زمانی یا فیلترها را تغییر دهید.</p></div>
+    <div class="state hidden" id="errorState"><span>!</span><h3>دریافت اخبار ممکن نشد</h3><p>پس از اجرای نخست GitHub Actions، خبرهای واقعی اینجا نمایش داده می‌شوند.</p></div>
+    <button class="load-more hidden" id="loadMore">نمایش خبرهای بیشتر</button>
+  </main>
+
+  <footer><span>نبض</span><p>اخبار از ۱۸ منبع منتخب شما • حقوق مطالب متعلق به ناشران اصلی است.</p></footer>
+  <script src="app.js" defer></script>
+</body>
+</html>
