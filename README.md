@@ -11,6 +11,7 @@ News and images are not committed to the repository or kept as a permanent archi
 - Persian RTL interface with responsive mobile layout
 - Dark and light themes
 - Topic, publisher, date-range, and text filters
+- Strict title-only curation: a story is included only when its headline contains a configured topic keyword
 - Technology, space, and economy as high-priority topics
 - Science, health, and Marvel as medium-priority topics
 - Gaming, entertainment, politics, and world news as normal-priority topics
@@ -38,7 +39,7 @@ python -m venv .venv
 python -m http.server 8000
 ```
 
-Open `http://localhost:8000` in a browser. Sources, topic keywords, and priority levels can be edited in `scripts/fetch_news.py`.
+Open `http://localhost:8000` in a browser. Sources, headline keywords, and priority levels can be edited in `scripts/fetch_news.py`. Summaries and full article bodies are not used for topic selection.
 
 ## Notes
 

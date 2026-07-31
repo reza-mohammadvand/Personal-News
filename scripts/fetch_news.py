@@ -99,7 +99,13 @@ def image(entry) -> str:
 
 def classify(text: str) -> tuple[str, list[str]]:
     lowered = text.casefold().replace("ي", "ی").replace("ك", "ک")
-    scores = {topic: sum(1 for word in words if word in lowered) for topic, words in TOPICS.items()}
+    def matches(keyword: str) -> bool:
+        keyword = keyword.casefold()
+        if keyword.isascii():
+            return bool(re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", lowered))
+        return keyword in lowered
+
+    scores = {topic: sum(1 for word in words if matches(word)) for topic, words in TOPICS.items()}
     ranked = sorted(scores, key=scores.get, reverse=True)
     topic = ranked[0] if scores[ranked[0]] else "other"
     tags = [TAG_LABELS[t] for t in ranked[:2] if scores[t] > 0]
@@ -136,7 +142,9 @@ def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[st
         paragraph = container.find("p") if container else None
         if paragraph:
             summary = clean(paragraph.get_text(" ", strip=True))
-        topic, tags = classify(f"{title} {summary}")
+        topic, tags = classify(title)
+        if topic == "other":
+            continue
         results.append({"title": title, "summary": summary, "link": link, "source": source,
             "published": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "image": image_url, "topic": topic, "tags": tags,
@@ -265,8 +273,9 @@ def main() -> None:
                 if not link or not title or key in seen or date < cutoff:
                     continue
                 summary = clean(entry.get("summary") or entry.get("description"))
-                topic, tags = classify(f"{title} {summary}")
-                # Keep broad-interest items from the user's hand-picked sources.
+                topic, tags = classify(title)
+                if topic == "other":
+                    continue
                 articles.append({"title": title, "summary": summary, "link": link,
                     "source": source, "published": date.isoformat().replace("+00:00", "Z"),
                     "image": image(entry), "topic": topic, "tags": tags,
