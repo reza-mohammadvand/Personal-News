@@ -1,6 +1,6 @@
 const state={articles:[],topic:'all',source:'all',days:1,query:'',shown:12};
 const $=s=>document.querySelector(s); const fa=n=>Number(n).toLocaleString('fa-IR');
-const topicNames={technology:'فناوری',space:'فضا و نجوم',economy:'اقتصاد',science:'علم و سلامت',gaming:'بازی و سرگرمی',politics:'سیاست و جهان',other:'سایر'};
+const topicNames={technology:'فناوری',space:'فضا و نجوم',economy:'اقتصاد',science:'علم و سلامت',marvel:'مارول',gaming:'بازی و سرگرمی',politics:'سیاست و جهان',other:'سایر'};
 const priorityNames={3:'اولویت بالا',2:'اولویت متوسط',1:'اولویت عادی'};
 
 function esc(v=''){const d=document.createElement('div');d.textContent=v;return d.innerHTML}

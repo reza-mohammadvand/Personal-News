@@ -2,17 +2,21 @@
 from __future__ import annotations
 
 import html
+import hashlib
+import io
 import json
 import re
+import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 if hasattr(sys.stdout, "reconfigure"):
@@ -48,12 +52,13 @@ HTML_SOURCES = {
 
 TOPIC_PRIORITY = {
     "technology": 3, "space": 3, "economy": 3,
-    "science": 2, "gaming": 1, "politics": 1, "other": 0,
+    "science": 2, "marvel": 2, "gaming": 1, "politics": 1, "other": 0,
 }
 
 TOPICS = {
     "space": ["فضا", "نجوم", "سیاره", "مریخ", "ماه", "خورشید", "ستاره", "کهکشان", "سیاه چاله", "سیاه‌چاله", "تلسکوپ", "جیمز وب", "هابل", "اسپیس ایکس", "اسپیس‌ایکس", "ماهواره", "فضانورد", "ناسا", "شهاب", "asteroid", "astronomy", "space", "spacex", "nasa", "starship", "telescope", "galaxy", "planet", "exoplanet", "black hole"],
     "economy": ["اقتصاد", "بورس", "بانک", "بیمه", "مالیات", "رمزارز", "بیت کوین", "بیت‌کوین", "طلا", "سکه", "ارز", "مسکن", "تجارت", "بازار", "سرمایه", "fintech", "economy", "economic", "market", "crypto", "bitcoin", "finance", "business", "stock"],
+    "marvel": ["مارول", "دنیای سینمایی مارول", "انتقام جویان", "انتقام‌جویان", "مرد عنکبوتی", "مردعنکبوتی", "ددپول", "ولورین", "چهار شگفت انگیز", "چهار شگفت‌انگیز", "دردویل", "کاپیتان آمریکا", "مرد آهنی", "marvel", "mcu", "avengers", "spider-man", "spiderman", "x-men", "fantastic four", "deadpool", "wolverine", "daredevil", "captain america", "iron man"],
     "gaming": ["بازی", "گیم", "سینما", "فیلم", "سریال", "پلی استیشن", "پلی‌استیشن", "ایکس باکس", "نینتندو", "gaming", "game", "xbox", "playstation", "nintendo", "movie", "cinema"],
     "science": ["علم", "پزشکی", "سلامت", "زیست", "اقلیم", "دانشمند", "پژوهش", "science", "health", "medical", "climate", "biology", "research"],
     "politics": ["سیاست", "دیپلماسی", "دولت", "جنگ", "بین الملل", "بین‌الملل", "politics", "government", "diplomacy", "war", "world"],
@@ -61,7 +66,7 @@ TOPICS = {
 }
 
 TAG_LABELS = {
-    "space": "فضا و نجوم", "economy": "اقتصاد", "gaming": "بازی و سرگرمی",
+    "space": "فضا و نجوم", "economy": "اقتصاد", "marvel": "مارول", "gaming": "بازی و سرگرمی",
     "science": "علم و سلامت", "politics": "سیاست و جهان", "technology": "فناوری",
 }
 
@@ -80,15 +85,16 @@ def published(entry) -> datetime:
 
 
 def image(entry) -> str:
+    base = entry.get("link", "")
     for key in ("media_content", "media_thumbnail"):
         for item in entry.get(key, []):
             if item.get("url"):
-                return item["url"].replace("http://", "https://")
+                return urljoin(base, item["url"]).replace("http://", "https://")
     for item in entry.get("enclosures", []):
         if item.get("type", "").startswith("image") and item.get("href"):
-            return item["href"].replace("http://", "https://")
+            return urljoin(base, item["href"]).replace("http://", "https://")
     match = re.search(r'<img[^>]+src=["\']([^"\']+)', entry.get("summary", ""), re.I)
-    return match.group(1).replace("http://", "https://") if match else ""
+    return urljoin(base, match.group(1)).replace("http://", "https://") if match else ""
 
 
 def classify(text: str) -> tuple[str, list[str]]:
@@ -169,6 +175,70 @@ def translate_article(article: dict) -> dict:
     return article
 
 
+STOP_WORDS = {
+    "برای", "این", "آن", "یک", "در", "از", "به", "با", "که", "شد", "شده", "است",
+    "های", "روی", "خود", "جدید", "خبر", "the", "and", "for", "with", "from", "this",
+    "that", "new", "its", "into", "about", "after", "will", "has", "have",
+}
+
+
+def title_tokens(title: str) -> set[str]:
+    normalized = title.casefold().replace("ي", "ی").replace("ك", "ک")
+    return {word for word in re.findall(r"[\w\u0600-\u06ff]+", normalized)
+            if len(word) > 2 and word not in STOP_WORDS}
+
+
+def deduplicate_articles(articles: list[dict]) -> list[dict]:
+    """Keep one card when translated headlines describe the same story."""
+    ordered = sorted(articles, key=lambda a: (a["priority"], a["published"]), reverse=True)
+    kept: list[dict] = []
+    token_sets: list[set[str]] = []
+    links: set[str] = set()
+    for article in ordered:
+        canonical_link = article["link"].split("?")[0].rstrip("/")
+        tokens = title_tokens(article["title"])
+        duplicate = canonical_link in links
+        if not duplicate and len(tokens) >= 3:
+            for previous in token_sets:
+                shared = len(tokens & previous)
+                union = len(tokens | previous)
+                if shared >= 3 and union and shared / union >= 0.58:
+                    duplicate = True
+                    break
+        if duplicate:
+            continue
+        kept.append(article)
+        token_sets.append(tokens)
+        links.add(canonical_link)
+    return kept
+
+
+def cache_image(article: dict, directory: Path, headers: dict[str, str]) -> bool:
+    """Cache and optimize an image so publisher hotlink rules cannot break cards."""
+    image_url = article.get("image", "")
+    if not image_url or image_url.startswith("data:"):
+        article["image"] = ""
+        return False
+    try:
+        request_headers = dict(headers)
+        request_headers["Referer"] = article["link"]
+        response = requests.get(image_url, headers=request_headers, timeout=18)
+        response.raise_for_status()
+        if len(response.content) > 8_000_000:
+            raise ValueError("image too large")
+        with Image.open(io.BytesIO(response.content)) as picture:
+            picture.seek(0)
+            picture = picture.convert("RGB")
+            picture.thumbnail((960, 600), Image.Resampling.LANCZOS)
+            name = hashlib.sha1(image_url.encode()).hexdigest()[:20] + ".webp"
+            picture.save(directory / name, "WEBP", quality=74, method=4)
+        article["image"] = f"data/images/{name}"
+        return True
+    except (requests.RequestException, OSError, ValueError):
+        article["image"] = ""
+        return False
+
+
 def main() -> None:
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
     articles, seen, status = [], set(), {}
@@ -223,6 +293,19 @@ def main() -> None:
             for future in as_completed(futures):
                 future.result()
         print(f"Translated {sum(1 for article in english if article.get('translated'))}/{len(english)} articles")
+    before = len(articles)
+    articles = deduplicate_articles(articles)
+    print(f"Removed {before - len(articles)} duplicate stories")
+
+    image_dir = ROOT / "data" / "images"
+    if image_dir.exists():
+        shutil.rmtree(image_dir)
+    image_dir.mkdir(parents=True)
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        image_jobs = [pool.submit(cache_image, article, image_dir, headers) for article in articles]
+        cached = sum(1 for future in as_completed(image_jobs) if future.result())
+    print(f"Cached {cached}/{len(articles)} article images")
+
     articles.sort(key=lambda a: (a["priority"], a["published"]), reverse=True)
     payload = {"updated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "articles": articles, "sources": status}
     out = ROOT / "data" / "news.json"; out.parent.mkdir(exist_ok=True)
