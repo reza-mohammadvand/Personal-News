@@ -57,11 +57,11 @@ TOPIC_PRIORITY = {
 
 TOPICS = {
     "space": ["فضا", "نجوم", "سیاره", "مریخ", "ماه", "خورشید", "ستاره", "کهکشان", "سیاه چاله", "سیاه‌چاله", "تلسکوپ", "جیمز وب", "هابل", "اسپیس ایکس", "اسپیس‌ایکس", "ماهواره", "فضانورد", "ناسا", "شهاب", "asteroid", "astronomy", "space", "spacex", "nasa", "starship", "telescope", "galaxy", "planet", "exoplanet", "black hole"],
-    "economy": ["اقتصاد", "بورس", "بانک", "بیمه", "مالیات", "رمزارز", "بیت کوین", "بیت‌کوین", "طلا", "سکه", "ارز", "مسکن", "تجارت", "بازار", "سرمایه", "fintech", "economy", "economic", "market", "crypto", "bitcoin", "finance", "business", "stock"],
+    "economy": ["اقتصاد", "بورس", "رمزارز", "بیت کوین", "بیت‌کوین", "طلا", "سکه", "ارز", "مسکن", "تجارت", "بازار", "سرمایه", "fintech", "economy", "economic", "market", "crypto", "bitcoin", "finance", "business", "stock"],
     "marvel": ["مارول", "دنیای سینمایی مارول", "انتقام جویان", "انتقام‌جویان", "مرد عنکبوتی", "مردعنکبوتی", "ددپول", "ولورین", "چهار شگفت انگیز", "چهار شگفت‌انگیز", "دردویل", "کاپیتان آمریکا", "مرد آهنی", "marvel", "mcu", "avengers", "spider-man", "spiderman", "x-men", "fantastic four", "deadpool", "wolverine", "daredevil", "captain america", "iron man"],
-    "gaming": ["بازی", "گیم", "سینما", "فیلم", "سریال", "پلی استیشن", "پلی‌استیشن", "ایکس باکس", "نینتندو", "gaming", "game", "xbox", "playstation", "nintendo", "movie", "cinema"],
-    "science": ["علم", "پزشکی", "سلامت", "زیست", "اقلیم", "دانشمند", "پژوهش", "science", "health", "medical", "climate", "biology", "research"],
-    "politics": ["سیاست", "دیپلماسی", "دولت", "جنگ", "بین الملل", "بین‌الملل", "politics", "government", "diplomacy", "war", "world"],
+    "gaming": ["بازی", "گیم", "سینما", "فیلم", "سریال", "پلی استیشن", "پلی‌استیشن", "ایکس باکس", "gaming", "game", "playstation", "movie", "cinema"],
+    "science": ["علم", "پزشکی", "سلامت", "دانشمند", "science"],
+    "politics": ["سیاست", "دیپلماسی", "جنگ", "بین الملل", "بین‌الملل", "politics", "government", "diplomacy", "war", "world"],
     "technology": ["فناوری", "موبایل", "گوشی", "اندروید", "آیفون", "اپل", "سامسونگ", "لپ تاپ", "لپ‌تاپ", "کامپیوتر", "سخت افزار", "سخت‌افزار", "نرم افزار", "نرم‌افزار", "هوش مصنوعی", "امنیت", "هک", "اینترنت", "گجت", "خودرو", "استارتاپ", "technology", "tech", "mobile", "android", "iphone", "apple", "google", "ai", "artificial intelligence", "security", "software", "hardware", "startup", "robot"],
 }
 
