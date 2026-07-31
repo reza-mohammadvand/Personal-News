@@ -40,14 +40,12 @@ SOURCES = {
     "TechCrunch": ["https://techcrunch.com/feed/"],
     "Sky & Telescope": ["https://skyandtelescope.com/feed/"],
     "اکوایران": ["https://ecoiran.com/feeds/"],
-    "عصر اقتصاد": ["https://asre-eghtesad.com/feed/"],
     "The Economist": ["https://www.economist.com/the-world-this-week/rss.xml", "https://www.economist.com/business/rss.xml", "https://www.economist.com/science-and-technology/rss.xml"],
     "Bloomberg": ["https://feeds.bloomberg.com/technology/news.rss", "https://feeds.bloomberg.com/markets/news.rss", "https://feeds.bloomberg.com/economics/news.rss"],
 }
 
 HTML_SOURCES = {
     "شهر سخت‌افزار": "https://www.shahrsakhtafzar.com/fa/",
-    "عصر اقتصاد": "https://asre-eghtesad.com/",
 }
 
 TOPIC_PRIORITY = {
