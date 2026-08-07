@@ -72,6 +72,10 @@ TAG_LABELS = {
 
 
 def clean(value: str | None, limit: int = 260) -> str:
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    elif value is not None and not isinstance(value, str):
+        value = str(value)
     value = re.sub(r"<[^>]+>", " ", value or "")
     value = html.unescape(re.sub(r"\s+", " ", value)).strip()
     return value[:limit].rstrip() + ("…" if len(value) > limit else "")
@@ -105,6 +109,28 @@ def safe_image(entry) -> str:
         return image(entry)
     except Exception:
         return ""
+
+
+def build_feed_article(entry, source: str, cutoff: datetime, seen: set[str]):
+    """Convert one feed entry without allowing malformed publisher data to stop the run."""
+    try:
+        link = str(entry.get("link", "")).split("#")[0]
+        title = clean(entry.get("title"), 180)
+        date = published(entry)
+        key = re.sub(r"\W", "", title.casefold())
+        if not link or not title or key in seen or date < cutoff:
+            return None
+        summary = clean(entry.get("summary") or entry.get("description"))
+        topic, tags = classify(title)
+        if topic == "other":
+            return None
+        return ({"title": title, "summary": summary, "link": link,
+            "source": source, "published": date.isoformat().replace("+00:00", "Z"),
+            "image": safe_image(entry), "topic": topic, "tags": tags,
+            "priority": TOPIC_PRIORITY[topic]}, key)
+    except Exception as exc:
+        print(f"Skipped malformed {source} entry: {type(exc).__name__}")
+        return None
 
 
 def classify(text: str) -> tuple[str, list[str]]:
@@ -275,22 +301,17 @@ def main() -> None:
             # The final candidate is only a fallback when the publisher feed is empty.
             if "news.google.com" in feed_url and count:
                 break
-            feed = feedparser.parse(feed_url, request_headers=headers)
+            try:
+                feed = feedparser.parse(feed_url, request_headers=headers)
+            except Exception as exc:
+                print(f"Feed failed for {source}: {type(exc).__name__}")
+                continue
             for entry in feed.entries:
-                link = entry.get("link", "").split("#")[0]
-                title = clean(entry.get("title"), 180)
-                date = published(entry)
-                key = re.sub(r"\W", "", title.casefold())
-                if not link or not title or key in seen or date < cutoff:
+                built = build_feed_article(entry, source, cutoff, seen)
+                if not built:
                     continue
-                summary = clean(entry.get("summary") or entry.get("description"))
-                topic, tags = classify(title)
-                if topic == "other":
-                    continue
-                articles.append({"title": title, "summary": summary, "link": link,
-                    "source": source, "published": date.isoformat().replace("+00:00", "Z"),
-                    "image": safe_image(entry), "topic": topic, "tags": tags,
-                    "priority": TOPIC_PRIORITY[topic]})
+                article, key = built
+                articles.append(article)
                 seen.add(key); count += 1
                 if count >= MAX_PER_SOURCE: break
         if source in HTML_SOURCES and count < MAX_PER_SOURCE:
