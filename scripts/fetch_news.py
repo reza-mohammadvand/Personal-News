@@ -78,7 +78,10 @@ def clean(value: str | None, limit: int = 260) -> str:
 def published(entry) -> datetime:
     stamp = entry.get("published_parsed") or entry.get("updated_parsed")
     if stamp:
-        return datetime(*stamp[:6], tzinfo=timezone.utc)
+        try:
+            return datetime(*stamp[:6], tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            pass
     return datetime.now(timezone.utc)
 
 
@@ -93,6 +96,13 @@ def image(entry) -> str:
             return urljoin(base, item["href"]).replace("http://", "https://")
     match = re.search(r'<img[^>]+src=["\']([^"\']+)', entry.get("summary", ""), re.I)
     return urljoin(base, match.group(1)).replace("http://", "https://") if match else ""
+
+
+def safe_image(entry) -> str:
+    try:
+        return image(entry)
+    except Exception:
+        return ""
 
 
 def classify(text: str) -> tuple[str, list[str]]:
@@ -176,8 +186,9 @@ def translate_article(article: dict) -> dict:
         article["title"] = clean(title, 180)
         article["summary"] = clean(summary)
         article["translated"] = True
-    except (requests.RequestException, ValueError, TypeError, IndexError):
+    except Exception as exc:
         article["translated"] = False
+        article["translation_error"] = type(exc).__name__
     return article
 
 
@@ -240,7 +251,7 @@ def cache_image(article: dict, directory: Path, headers: dict[str, str]) -> bool
             picture.save(directory / name, "WEBP", quality=74, method=4)
         article["image"] = f"data/images/{name}"
         return True
-    except (requests.RequestException, OSError, ValueError):
+    except Exception:
         article["image"] = ""
         return False
 
@@ -276,7 +287,7 @@ def main() -> None:
                     continue
                 articles.append({"title": title, "summary": summary, "link": link,
                     "source": source, "published": date.isoformat().replace("+00:00", "Z"),
-                    "image": image(entry), "topic": topic, "tags": tags,
+                    "image": safe_image(entry), "topic": topic, "tags": tags,
                     "priority": TOPIC_PRIORITY[topic]})
                 seen.add(key); count += 1
                 if count >= MAX_PER_SOURCE: break
@@ -288,7 +299,7 @@ def main() -> None:
                 )
                 articles.extend(scraped)
                 count += len(scraped)
-            except requests.RequestException as exc:
+            except Exception as exc:
                 print(f"HTML fallback failed for {source}: {exc}")
         status[source] = count
         print(f"{source}: {count}")

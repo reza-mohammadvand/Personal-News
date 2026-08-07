@@ -27,7 +27,12 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: دریافت خبرهای تازه
-        run: python scripts/fetch_news.py
+        run: |
+          python scripts/fetch_news.py || {
+            echo "First collection attempt failed; retrying once..."
+            python scripts/fetch_news.py
+          }
+        timeout-minutes: 15
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
