@@ -33,6 +33,8 @@ jobs:
             python scripts/fetch_news.py
           }
         timeout-minutes: 10
+      - name: نسخه‌گذاری فایل‌های استاتیک
+        run: sed -i "s/__BUILD_VERSION__/${GITHUB_SHA::8}/g" index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
