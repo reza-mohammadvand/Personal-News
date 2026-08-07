@@ -28,7 +28,7 @@ News and images are not committed to the repository or kept as a permanent archi
 4. Open the **Actions** tab and run the news deployment workflow once manually.
 5. After the workflow finishes, the public URL will appear in the workflow summary and under **Settings → Pages**.
 
-The site will then refresh automatically once per day. Its default date filter shows stories from the last 24 hours.
+The collection workflow runs every 30 minutes. A browser refresh always bypasses the JSON cache and loads the latest deployed collection. Its default date filter shows stories from the last 24 hours.
 
 ## Running locally
 
