@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -32,7 +32,7 @@ jobs:
             echo "First collection attempt failed; retrying once..."
             python scripts/fetch_news.py
           }
-        timeout-minutes: 15
+        timeout-minutes: 10
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

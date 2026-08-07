@@ -7,6 +7,7 @@ import io
 import json
 import re
 import shutil
+import socket
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
+socket.setdefaulttimeout(18)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 MAX_AGE_DAYS = 35
@@ -178,7 +180,7 @@ def translate_article(article: dict) -> dict:
         response = requests.get(
             "https://translate.googleapis.com/translate_a/single",
             params={"client": "gtx", "sl": "en", "tl": "fa", "dt": "t", "q": original},
-            headers={"User-Agent": "Mozilla/5.0"}, timeout=18,
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=(5, 10),
         )
         response.raise_for_status()
         translated = "".join(piece[0] for piece in response.json()[0] if piece[0])
@@ -239,7 +241,7 @@ def cache_image(article: dict, directory: Path, headers: dict[str, str]) -> bool
     try:
         request_headers = dict(headers)
         request_headers["Referer"] = article["link"]
-        response = requests.get(image_url, headers=request_headers, timeout=18)
+        response = requests.get(image_url, headers=request_headers, timeout=(4, 7))
         response.raise_for_status()
         if len(response.content) > 8_000_000:
             raise ValueError("image too large")
@@ -306,7 +308,7 @@ def main() -> None:
     english = [article for article in articles if is_english(article["title"])]
     if english:
         print(f"Translating {len(english)} English articles...")
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=16) as pool:
             futures = [pool.submit(translate_article, article) for article in english]
             for future in as_completed(futures):
                 future.result()
@@ -319,7 +321,7 @@ def main() -> None:
     if image_dir.exists():
         shutil.rmtree(image_dir)
     image_dir.mkdir(parents=True)
-    with ThreadPoolExecutor(max_workers=12) as pool:
+    with ThreadPoolExecutor(max_workers=24) as pool:
         image_jobs = [pool.submit(cache_image, article, image_dir, headers) for article in articles]
         cached = sum(1 for future in as_completed(image_jobs) if future.result())
     print(f"Cached {cached}/{len(articles)} article images")
