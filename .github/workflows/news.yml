@@ -28,22 +28,10 @@ jobs:
       - run: pip install -r requirements.txt
       - name: دریافت خبرهای تازه
         run: |
-          curl --retry 2 --fail --silent --show-error \
-            https://reza-mohammadvand.github.io/Personal-News/data/news.json \
-            --output /tmp/previous-news.json || true
-          set +e
-          python scripts/fetch_news.py > data/fetch-diagnostic.txt 2>&1
-          result=$?
-          cat data/fetch-diagnostic.txt
-          if [ $result -ne 0 ]; then
-            echo "First collection attempt failed; retrying once..." | tee -a data/fetch-diagnostic.txt
-            python scripts/fetch_news.py >> data/fetch-diagnostic.txt 2>&1
-            result=$?
-          fi
-          if [ $result -ne 0 ] && [ -s /tmp/previous-news.json ]; then
-            cp /tmp/previous-news.json data/news.json
-          fi
-          exit 0
+          python scripts/fetch_news.py || {
+            echo "First collection attempt failed; retrying once..."
+            python scripts/fetch_news.py
+          }
         timeout-minutes: 10
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
