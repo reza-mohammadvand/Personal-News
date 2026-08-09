@@ -1,6 +1,6 @@
-# Nabz — Personal News Dashboard
+# داشبورد شخصی اخبار — Personal News Dashboard
 
-Nabz is a lightweight, mobile-friendly Persian news dashboard that follows 18 selected publishers across technology, economy, science, space, astronomy, gaming, entertainment, politics, and Marvel.
+داشبورد شخصی اخبار is a lightweight, mobile-friendly Persian news dashboard that follows selected publishers across technology, economy, science, space, astronomy, gaming, entertainment, politics, Marvel, and new gadget discovery.
 
 The website is fully static. A scheduled GitHub Actions workflow collects the latest stories once a day, translates English titles and summaries into Persian, removes duplicate stories, optimizes article images, and deploys the result to GitHub Pages. No server or database is required.
 
@@ -18,6 +18,7 @@ News and images are not committed to the repository or kept as a permanent archi
 - Automatic English-to-Persian translation with graceful fallback
 - Cross-publisher duplicate story removal
 - Locally cached and optimized WebP images to avoid broken publisher hotlinks
+- Dedicated Gadget Flow catalog extraction that includes every product from the latest three Tech Gadgets pages without keyword filtering
 - RSS feeds with homepage extraction fallbacks for publishers such as Shahr Sakhtafzar and Asr-e Eqtesad
 
 ## Deploying to GitHub Pages

@@ -42,7 +42,7 @@ SOURCES = {
     "TechCrunch": ["https://techcrunch.com/feed/"],
     "Sky & Telescope": ["https://skyandtelescope.com/feed/"],
     "اکوایران": ["https://ecoiran.com/feeds/"],
-    "thegadgetflow": ["https://thegadgetflow.com/"],
+    "Gadget Flow": ["https://thegadgetflow.com/categories/tech-gadgets/"],
     "The Economist": ["https://www.economist.com/the-world-this-week/rss.xml", "https://www.economist.com/business/rss.xml", "https://www.economist.com/science-and-technology/rss.xml"],
     "Bloomberg": ["https://feeds.bloomberg.com/technology/news.rss", "https://feeds.bloomberg.com/markets/news.rss", "https://feeds.bloomberg.com/economics/news.rss"],
 }
@@ -192,6 +192,67 @@ def scrape_homepage(source: str, url: str, headers: dict[str, str], seen: set[st
     return results
 
 
+def relative_product_date(value: str) -> datetime:
+    now = datetime.now(timezone.utc)
+    match = re.search(r"(\d+)\s*(minute|hour|day|week|month)", value.casefold())
+    if not match:
+        return now
+    amount = int(match.group(1))
+    unit = match.group(2)
+    if unit == "minute":
+        return now - timedelta(minutes=amount)
+    if unit == "hour":
+        return now - timedelta(hours=amount)
+    days = amount * ({"day": 1, "week": 7, "month": 30}.get(unit, 0))
+    return now - timedelta(days=days)
+
+
+def scrape_gadget_flow(headers: dict[str, str], seen: set[str], limit: int = 60) -> list[dict]:
+    """Collect the newest Gadget Flow catalog products without headline filtering."""
+    results = []
+    base = "https://thegadgetflow.com/categories/tech-gadgets/"
+    for page in range(1, 4):
+        url = base if page == 1 else f"{base}page/{page}/"
+        response = requests.get(url, headers=headers, timeout=(5, 20))
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        for card in soup.select(".gfl-product"):
+            heading = card.select_one("h2.gfl-product-title a[href]")
+            if not heading:
+                continue
+            title = clean(heading.get_text(" ", strip=True), 180)
+            link = urljoin(url, heading.get("href", "")).split("#")[0]
+            key = re.sub(r"\W", "", title.casefold())
+            if not title or not link or key in seen:
+                continue
+            picture = card.select_one("img.gfl-product-thumb-img")
+            image_url = ""
+            if picture:
+                image_url = (picture.get("data-breeze") or picture.get("data-src")
+                    or picture.get("src") or "")
+                if image_url.startswith("data:"):
+                    image_url = ""
+            categories = [clean(item.get_text(" ", strip=True), 40)
+                for item in card.select(".gfl-product-category-link")]
+            price_node = card.select_one(".gfl-product-price")
+            price = clean(price_node.get_text(" ", strip=True), 40) if price_node else ""
+            age_node = card.select_one(".gfl-product-publisher")
+            age = clean(age_node.get_text(" ", strip=True), 40) if age_node else ""
+            details = []
+            if categories:
+                details.append("Categories: " + ", ".join(categories[:3]))
+            if price:
+                details.append("Price: " + price)
+            results.append({"title": title, "summary": " | ".join(details), "link": link,
+                "source": "Gadget Flow", "published": relative_product_date(age).isoformat().replace("+00:00", "Z"),
+                "image": image_url, "topic": "technology", "tags": ["گجت‌های جدید"],
+                "priority": TOPIC_PRIORITY["technology"]})
+            seen.add(key)
+            if len(results) >= limit:
+                return results
+    return results
+
+
 def is_english(text: str) -> bool:
     letters = re.findall(r"[A-Za-z\u0600-\u06ff]", text)
     return bool(letters) and sum(ch.isascii() for ch in letters) / len(letters) > 0.65
@@ -244,7 +305,7 @@ def deduplicate_articles(articles: list[dict]) -> list[dict]:
         canonical_link = article["link"].split("?")[0].rstrip("/")
         tokens = title_tokens(article["title"])
         duplicate = canonical_link in links
-        if not duplicate and len(tokens) >= 3:
+        if article["source"] != "Gadget Flow" and not duplicate and len(tokens) >= 3:
             for previous in token_sets:
                 shared = len(tokens & previous)
                 union = len(tokens | previous)
@@ -288,8 +349,18 @@ def cache_image(article: dict, directory: Path, headers: dict[str, str]) -> bool
 def main() -> None:
     cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
     articles, seen, status = [], set(), {}
-    headers = {"User-Agent": "NabzNews/1.0 (+GitHub Pages RSS reader)"}
+    headers = {"User-Agent": "PersonalNewsDashboard/1.0 (+GitHub Pages reader)"}
     for source, feeds in SOURCES.items():
+        if source == "Gadget Flow":
+            try:
+                products = scrape_gadget_flow(headers, seen, MAX_PER_SOURCE)
+                articles.extend(products)
+                status[source] = len(products)
+                print(f"{source}: {len(products)}")
+            except Exception as exc:
+                status[source] = 0
+                print(f"Gadget Flow failed: {type(exc).__name__}: {exc}")
+            continue
         count = 0
         candidate_feeds = list(feeds)
         domain = urlparse(feeds[0]).netloc.removeprefix("www.")
