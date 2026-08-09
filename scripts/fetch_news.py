@@ -42,6 +42,7 @@ SOURCES = {
     "TechCrunch": ["https://techcrunch.com/feed/"],
     "Sky & Telescope": ["https://skyandtelescope.com/feed/"],
     "اکوایران": ["https://ecoiran.com/feeds/"],
+    "thegadgetflow": ["https://thegadgetflow.com/"],
     "The Economist": ["https://www.economist.com/the-world-this-week/rss.xml", "https://www.economist.com/business/rss.xml", "https://www.economist.com/science-and-technology/rss.xml"],
     "Bloomberg": ["https://feeds.bloomberg.com/technology/news.rss", "https://feeds.bloomberg.com/markets/news.rss", "https://feeds.bloomberg.com/economics/news.rss"],
 }
